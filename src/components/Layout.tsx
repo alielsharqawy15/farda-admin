@@ -6,6 +6,15 @@ const nav = [
   { to: '/orders', label: 'Orders' },
   { to: '/products', label: 'Products' },
   { to: '/categories', label: 'Categories' },
+  { to: '/slider', label: 'Hero Slider' },
+  { to: '/styles', label: 'Styles' },
+  { to: '/store-settings', label: 'Store Settings' },
+  { to: '/notifications', label: 'Notifications' },
+  { to: '/reviews', label: 'Reviews' },
+  { to: '/coupons', label: 'Coupons' },
+  { to: '/inventory', label: 'Inventory' },
+  { to: '/returns', label: 'Returns' },
+  { to: '/analytics', label: 'Analytics' },
   { to: '/users', label: 'Users' },
 ];
 
@@ -16,7 +25,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       <aside className="flex w-64 flex-col bg-primary text-white">
         <div className="border-b border-white/10 px-6 py-5">
-          <p className="text-lg font-semibold tracking-wide">StepUp</p>
+          <p className="text-lg font-semibold tracking-wide">Farda</p>
           <p className="text-xs uppercase tracking-[0.2em] text-white/60">Admin</p>
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">

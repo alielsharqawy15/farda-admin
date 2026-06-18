@@ -7,7 +7,7 @@ export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('admin@stepup.com');
+  const [email, setEmail] = useState('admin@farda.com');
   const [password, setPassword] = useState('Password123!');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,7 +31,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-primary px-4">
       <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-xl">
-        <p className="text-xs uppercase tracking-[0.25em] text-tertiary">StepUp Admin</p>
+        <p className="text-xs uppercase tracking-[0.25em] text-tertiary">Farda Admin</p>
         <h1 className="mt-2 text-2xl font-semibold">Sign in</h1>
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div>

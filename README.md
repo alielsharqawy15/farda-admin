@@ -1,6 +1,6 @@
-# StepUp Admin Dashboard
+# Farda Admin Dashboard
 
-React + Vite admin panel for the StepUp e-commerce platform.
+React + Vite admin panel for the Farda e-commerce platform.
 
 ## Prerequisites
 
@@ -21,7 +21,7 @@ Open **http://localhost:5174**
 
 Use the seeded admin account:
 
-- Email: `admin@stepup.com`
+- Email: `admin@farda.com`
 - Password: `Password123!`
 
 ## Workflow: Dashboard → Database → Mobile

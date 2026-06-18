@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, getAccessToken, getErrorMessage, mediaUrl, postForm, unwrap } from '../api/client';
 import { Alert, Field, flattenCategories, inputClass } from '../components/ui';
-import type { Brand, Category, Product, ProductImage, Variant } from '../types';
+import type { Brand, Category, Product, ProductImage, Style, Variant } from '../types';
 
 type VariantRow = {
   id?: string;
@@ -11,6 +11,7 @@ type VariantRow = {
   colorHex: string;
   price: string;
   stock: string;
+  lowStockThreshold: string;
 };
 
 const defaultVariant = (): VariantRow => ({
@@ -19,6 +20,7 @@ const defaultVariant = (): VariantRow => ({
   colorHex: '#121212',
   price: '299',
   stock: '10',
+  lowStockThreshold: '5',
 });
 
 function toVariantRow(v: Variant): VariantRow {
@@ -29,6 +31,7 @@ function toVariantRow(v: Variant): VariantRow {
     colorHex: String(v.colorHex || '#121212'),
     price: String(v.price),
     stock: String(v.stock),
+    lowStockThreshold: String(v.lowStockThreshold ?? 5),
   };
 }
 
@@ -48,6 +51,7 @@ function variantPayload(v: VariantRow) {
     colorHex: v.colorHex,
     price: Number(v.price),
     stock: Number(v.stock),
+    lowStockThreshold: Number(v.lowStockThreshold),
   };
 }
 
@@ -83,6 +87,8 @@ export default function ProductFormPage() {
 
   const [brands, setBrands] = useState<Brand[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [styles, setStyles] = useState<Style[]>([]);
+  const [styleIds, setStyleIds] = useState<string[]>([]);
   const [productId, setProductId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -103,12 +109,14 @@ export default function ProductFormPage() {
   useEffect(() => {
     async function init() {
       try {
-        const [brandList, categoryList] = await Promise.all([
+        const [brandList, categoryList, styleList] = await Promise.all([
           unwrap<Brand[]>(api.get('/brands')),
           unwrap<Category[]>(api.get('/categories')),
+          unwrap<Style[]>(api.get('/admin/styles')),
         ]);
         setBrands(brandList);
         setCategories(categoryList);
+        setStyles(styleList);
 
         if (!isNew && slug) {
           const product = await unwrap<Product>(api.get(`/products/${slug}`));
@@ -119,6 +127,7 @@ export default function ProductFormPage() {
           setCategoryId(product.category?.id ?? '');
           setTags((product.tags || []).join(', '));
           setIsFeatured(product.isFeatured);
+          setStyleIds((product.styles || []).map((item) => item.style.id));
           setExistingImages(product.images || []);
           setVariants(
             product.variants?.length
@@ -168,6 +177,7 @@ export default function ProductFormPage() {
         categoryId,
         tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
         isFeatured,
+        styleIds,
       };
 
       let id = productId;
@@ -346,6 +356,24 @@ export default function ProductFormPage() {
           <Field label="Tags (comma separated)">
             <input className={inputClass} value={tags} onChange={(e) => setTags(e.target.value)} placeholder="running, sneakers" />
           </Field>
+          <Field label="Styles">
+            <div className="flex flex-wrap gap-2 rounded border border-black/10 p-3">
+              {styles.map((style) => (
+                <label key={style.id} className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={styleIds.includes(style.id)}
+                    onChange={(e) => {
+                      setStyleIds((ids) =>
+                        e.target.checked ? [...ids, style.id] : ids.filter((id) => id !== style.id)
+                      );
+                    }}
+                  />
+                  {style.name}
+                </label>
+              ))}
+            </div>
+          </Field>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={isFeatured} onChange={(e) => setIsFeatured(e.target.checked)} />
             Featured on homepage
@@ -366,7 +394,7 @@ export default function ProductFormPage() {
           </div>
           <div className="space-y-3">
             {variants.map((variant, index) => (
-              <div key={variant.id ?? index} className="grid gap-2 rounded border border-black/5 p-3 sm:grid-cols-5">
+              <div key={variant.id ?? index} className="grid gap-2 rounded border border-black/5 p-3 sm:grid-cols-6">
                 <input className={inputClass} placeholder="Size" value={variant.size}
                   onChange={(e) => updateRow(index, { size: e.target.value })} />
                 <input className={inputClass} placeholder="Color" value={variant.color}
@@ -375,6 +403,8 @@ export default function ProductFormPage() {
                   onChange={(e) => updateRow(index, { price: e.target.value })} />
                 <input className={inputClass} placeholder="Stock" type="number" min="0" step="1" value={variant.stock}
                   onChange={(e) => updateRow(index, { stock: e.target.value })} />
+                <input className={inputClass} placeholder="Low stock" type="number" min="0" step="1" value={variant.lowStockThreshold}
+                  onChange={(e) => updateRow(index, { lowStockThreshold: e.target.value })} />
                 {variants.length > 1 && (
                   <button type="button" className="text-sm font-semibold text-sale"
                     onClick={() => deleteExistingVariant(index)}>

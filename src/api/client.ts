@@ -113,7 +113,7 @@ async function refreshAccessToken(): Promise<string | null> {
 export async function postForm<T>(
   url: string,
   formData: FormData,
-  method: 'POST' | 'PUT' = 'POST'
+  method: 'POST' | 'PUT' | 'PATCH' = 'POST'
 ): Promise<T> {
   let token = getAccessToken();
   let response = await fetch(`/api/v1${url}`, {
