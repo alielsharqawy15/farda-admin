@@ -1,11 +1,14 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import type React from 'react';
+import { Link, useParams } from 'react-router-dom';
 import { api, getErrorMessage, mediaUrl, postForm, unwrap, unwrapList } from '../api/client';
 import { Alert, Field, inputClass, PageHeader } from '../components/ui';
 import type {
   AnalyticsStats,
   Coupon,
   NotificationItem,
+  AuditLog,
+  PaymentMaintenanceStatus,
   ReturnRequest,
   Review,
   StoreSettings,
@@ -235,9 +238,7 @@ export function ReturnsPage() {
       <PageHeader title="Returns" subtitle="Approve, reject, and refund return requests" />
       <SimpleTable headers={['Order', 'Customer', 'Reason', 'Status', 'Refund', 'Actions']} rows={returns.map((ret) => [
         ret.order?.orderNumber ?? '-', ret.order?.user?.email ?? '-', ret.reason, ret.status, String(ret.refundAmount ?? '-'),
-        <select key={ret.id} className={inputClass} value={ret.status} onChange={(e) => api.patch(`/admin/returns/${ret.id}/status`, { status: e.target.value }).then(load)}>
-          <option value="REQUESTED">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option><option value="REFUNDED">Refunded</option>
-        </select>,
+        <Link key={ret.id} to={`/returns/${ret.id}`} className="text-primary underline">Review</Link>,
       ])} />
     </div>
   );
@@ -277,6 +278,273 @@ export function AnalyticsPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+export function AuditLogsPage() {
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [entityType, setEntityType] = useState('');
+  const [action, setAction] = useState('');
+  const [entityId, setEntityId] = useState('');
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const result = await unwrapList<AuditLog>(
+        api.get('/admin/audit-logs', {
+          params: {
+            limit: 100,
+            ...(entityType ? { entityType } : {}),
+            ...(action ? { action } : {}),
+            ...(entityId ? { entityId } : {}),
+            ...(from ? { from: new Date(from).toISOString() } : {}),
+            ...(to ? { to: new Date(to).toISOString() } : {}),
+          },
+        })
+      );
+      setLogs(result.items);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }, [action, entityId, entityType, from, to]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div>
+      <PageHeader title="Audit Logs" subtitle="Admin and system actions across orders, payments, inventory, products, and coupons" />
+      {error && <Alert message={error} />}
+      <div className="mb-4 grid gap-3 rounded-lg border border-black/5 bg-white p-4 shadow-sm md:grid-cols-5">
+        <Field label="Entity type">
+          <select className={inputClass} value={entityType} onChange={(e) => setEntityType(e.target.value)}>
+            <option value="">All</option>
+            <option value="Order">Order</option>
+            <option value="Product">Product</option>
+            <option value="Variant">Variant</option>
+            <option value="Coupon">Coupon</option>
+            <option value="Return">Return</option>
+            <option value="Review">Review</option>
+          </select>
+        </Field>
+        <Field label="Action"><input className={inputClass} value={action} onChange={(e) => setAction(e.target.value)} placeholder="payment.failed" /></Field>
+        <Field label="Entity ID"><input className={inputClass} value={entityId} onChange={(e) => setEntityId(e.target.value)} /></Field>
+        <Field label="From"><input className={inputClass} type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+        <Field label="To"><input className={inputClass} type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+      </div>
+      <SimpleTable headers={['Action', 'Entity', 'Actor', 'Created']} rows={logs.map((log) => [
+        <Link key={log.id} to={`/audit-logs/${log.id}`} className="text-primary underline">{log.action}</Link>,
+        `${log.entityType}${log.entityId ? ` / ${log.entityId}` : ''}`,
+        log.actor?.email ?? 'System',
+        new Date(log.createdAt).toLocaleString(),
+      ])} />
+    </div>
+  );
+}
+
+export function AuditLogDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const [log, setLog] = useState<AuditLog | null>(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!id) return;
+    unwrap<AuditLog>(api.get(`/admin/audit-logs/${id}`)).then(setLog).catch((err) => setError(getErrorMessage(err)));
+  }, [id]);
+
+  return (
+    <div>
+      <PageHeader title="Audit Detail" subtitle="Before and after values for the selected event" />
+      {error && <Alert message={error} />}
+      {log && (
+        <div className="space-y-4">
+          <section className="rounded-lg border border-black/5 bg-white p-5 shadow-sm">
+            <p className="font-semibold">{log.action}</p>
+            <p className="mt-1 text-sm text-tertiary">{log.entityType} {log.entityId ?? ''}</p>
+            <p className="mt-1 text-sm text-tertiary">{log.actor?.email ?? 'System'} / {new Date(log.createdAt).toLocaleString()}</p>
+          </section>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <JsonPanel title="Before" value={log.before} />
+            <JsonPanel title="After" value={log.after} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function JobsPage() {
+  const [status, setStatus] = useState<PaymentMaintenanceStatus | null>(null);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      setStatus(await unwrap<PaymentMaintenanceStatus>(api.get('/admin/jobs/payment-maintenance')));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function runNow() {
+    setMessage('');
+    setError('');
+    try {
+      await api.post('/admin/jobs/payment-maintenance/run');
+      setMessage('Payment maintenance job queued');
+      await load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  return (
+    <div>
+      <PageHeader title="Jobs" subtitle="Unpaid order expiry and payment reconciliation health" />
+      {message && <Alert message={message} type="success" />}
+      {error && <Alert message={error} />}
+      <section className="rounded-lg border border-black/5 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold">Payment Maintenance</h2>
+            <p className="mt-1 text-sm text-tertiary">Expires stale unpaid online orders and reconciles pending Stripe payments.</p>
+          </div>
+          <button type="button" onClick={runNow} className="rounded bg-primary px-4 py-2 text-sm text-white">Run now</button>
+        </div>
+        {status && (
+          <dl className="mt-5 grid gap-3 text-sm md:grid-cols-4">
+            <Info label="Configured" value={status.configured ? 'Yes' : 'No'} />
+            <Info label="Next run" value={status.nextRunAt ? new Date(status.nextRunAt).toLocaleString() : '-'} />
+            <Info label="Last status" value={status.lastRun?.status ?? '-'} />
+            <Info label="Processed" value={`Expired ${status.lastRun?.result?.expired ?? 0} / Reconciled ${status.lastRun?.result?.reconciled ?? 0}`} />
+          </dl>
+        )}
+        {status?.failures?.length ? (
+          <div className="mt-5">
+            <h3 className="text-sm font-semibold">Recent failures</h3>
+            <ul className="mt-2 space-y-2 text-sm text-sale">
+              {status.failures.map((failure, index) => (
+                <li key={String(failure.id ?? index)}>{failure.failedReason ?? 'Unknown failure'}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+export function TwoFactorPage() {
+  const [enabled, setEnabled] = useState(false);
+  const [qrCode, setQrCode] = useState('');
+  const [secret, setSecret] = useState('');
+  const [code, setCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const load = useCallback(async () => {
+    try {
+      const me = await unwrap<{ twoFactorEnabled?: boolean }>(api.get('/auth/me'));
+      setEnabled(Boolean(me.twoFactorEnabled));
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function startSetup() {
+    setError('');
+    setMessage('');
+    try {
+      const result = await unwrap<{ secret: string; qrCode: string }>(api.post('/auth/enable-2fa'));
+      setSecret(result.secret);
+      setQrCode(result.qrCode);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  async function verify() {
+    setError('');
+    try {
+      await api.post('/auth/verify-2fa', { code });
+      setMessage('2FA enabled. Sign in again if your session expires.');
+      setCode('');
+      await load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  async function disable() {
+    setError('');
+    try {
+      await api.post('/auth/disable-2fa', { password, ...(code ? { code } : {}) });
+      setMessage('2FA disabled. Please sign in again when prompted.');
+      setPassword('');
+      setCode('');
+      setQrCode('');
+      setSecret('');
+      await load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  }
+
+  return (
+    <div>
+      <PageHeader title="Two-Factor Authentication" subtitle="Protect admin accounts with authenticator-app verification" />
+      {message && <Alert message={message} type="success" />}
+      {error && <Alert message={error} />}
+      <section className="max-w-xl rounded-lg border border-black/5 bg-white p-5 shadow-sm">
+        <p className="text-sm">Current status: <strong>{enabled ? 'Enabled' : 'Disabled'}</strong></p>
+        {!enabled && (
+          <div className="mt-5 space-y-4">
+            <button type="button" onClick={startSetup} className="rounded bg-primary px-4 py-2 text-sm text-white">Generate QR code</button>
+            {qrCode && <img src={qrCode} alt="2FA QR code" className="h-48 w-48 rounded border border-black/10" />}
+            {secret && <p className="break-all text-sm text-tertiary">Secret: {secret}</p>}
+            {qrCode && (
+              <div className="space-y-3">
+                <Field label="Authenticator code"><input className={inputClass} value={code} onChange={(e) => setCode(e.target.value)} /></Field>
+                <button type="button" onClick={verify} className="rounded bg-primary px-4 py-2 text-sm text-white">Verify and enable</button>
+              </div>
+            )}
+          </div>
+        )}
+        {enabled && (
+          <div className="mt-5 space-y-3">
+            <Field label="Password confirmation"><input className={inputClass} type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+            <Field label="Current 2FA code (recommended)"><input className={inputClass} value={code} onChange={(e) => setCode(e.target.value)} /></Field>
+            <button type="button" onClick={disable} className="rounded bg-sale px-4 py-2 text-sm text-white">Disable 2FA</button>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function Info({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded border border-black/5 p-3">
+      <dt className="text-xs uppercase tracking-wider text-tertiary">{label}</dt>
+      <dd className="mt-1 font-medium">{value}</dd>
+    </div>
+  );
+}
+
+function JsonPanel({ title, value }: { title: string; value: unknown }) {
+  return (
+    <section className="rounded-lg border border-black/5 bg-white p-5 shadow-sm">
+      <h2 className="font-semibold">{title}</h2>
+      <pre className="mt-3 max-h-96 overflow-auto rounded bg-secondary p-3 text-xs">
+        {value === undefined || value === null ? '-' : JSON.stringify(value, null, 2)}
+      </pre>
+    </section>
   );
 }
 

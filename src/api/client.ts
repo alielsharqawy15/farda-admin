@@ -12,7 +12,7 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -54,15 +54,25 @@ api.interceptors.response.use(
 );
 
 export function setAccessToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
+  sessionStorage.setItem(TOKEN_KEY, token);
+  localStorage.removeItem(TOKEN_KEY);
 }
 
 export function clearAccessToken() {
+  sessionStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_KEY);
 }
 
 export function getAccessToken() {
-  return localStorage.getItem(TOKEN_KEY);
+  const sessionToken = sessionStorage.getItem(TOKEN_KEY);
+  if (sessionToken) return sessionToken;
+
+  const legacyToken = localStorage.getItem(TOKEN_KEY);
+  if (legacyToken) {
+    sessionStorage.setItem(TOKEN_KEY, legacyToken);
+    localStorage.removeItem(TOKEN_KEY);
+  }
+  return legacyToken;
 }
 
 export function getErrorMessage(error: unknown): string {

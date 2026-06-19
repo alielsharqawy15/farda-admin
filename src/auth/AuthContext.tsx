@@ -5,7 +5,7 @@ import type { User } from '../types';
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, totpCode?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -42,8 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadUser();
   }, [loadUser]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const result = await unwrap<{ accessToken: string }>(api.post('/auth/login', { email, password }));
+  const login = useCallback(async (email: string, password: string, totpCode?: string) => {
+    const result = await unwrap<{ accessToken: string }>(
+      api.post('/auth/login', { email, password, ...(totpCode ? { totpCode } : {}) })
+    );
     setAccessToken(result.accessToken);
     const me = await unwrap<User>(api.get('/auth/me'));
     if (me.role !== 'ADMIN') {

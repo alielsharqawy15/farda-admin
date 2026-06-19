@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
 const nav = [
@@ -15,6 +15,9 @@ const nav = [
   { to: '/inventory', label: 'Inventory' },
   { to: '/returns', label: 'Returns' },
   { to: '/analytics', label: 'Analytics' },
+  { to: '/audit-logs', label: 'Audit Logs' },
+  { to: '/jobs', label: 'Jobs' },
+  { to: '/security/2fa', label: '2FA' },
   { to: '/users', label: 'Users' },
 ];
 
@@ -56,7 +59,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <main className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-7xl px-6 py-8">{children}</div>
+        <div className="mx-auto max-w-7xl px-6 py-8">
+          {user?.role === 'ADMIN' && !user.twoFactorEnabled && (
+            <div className="mb-6 rounded border border-sale/20 bg-sale/5 px-4 py-3 text-sm text-sale">
+              2FA is not enabled for this admin account. Sensitive production actions may be blocked.
+              {' '}
+              <Link to="/security/2fa" className="font-semibold underline">Set up 2FA</Link>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );

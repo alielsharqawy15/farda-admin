@@ -13,6 +13,7 @@ export interface User {
   role: 'CUSTOMER' | 'ADMIN';
   emailVerified?: boolean;
   loyaltyPoints?: number;
+  twoFactorEnabled?: boolean;
   createdAt?: string;
   _count?: { orders: number };
 }
@@ -23,10 +24,21 @@ export interface Order {
   status: string;
   paymentStatus: string;
   paymentProvider?: string | null;
+  trackingNumber?: string | null;
+  carrier?: string | null;
+  shippedAt?: string | null;
+  addressSnapshot?: Record<string, unknown>;
   total: number | string;
+  subtotal?: number | string;
+  discount?: number | string;
+  shipping?: number | string;
+  tax?: number | string;
   createdAt: string;
-  user?: { email: string; name?: string | null };
-  items?: Array<{ qty: number; productName?: string }>;
+  user?: { id?: string; email: string; name?: string | null; phone?: string | null; firstName?: string | null; lastName?: string | null };
+  items?: Array<{ id?: string; qty: number; unitPrice?: string | number; productName?: string; productSnapshot?: { name?: string; brand?: string; size?: string; color?: string; sku?: string; image?: string } }>;
+  payments?: Array<{ id: string; provider: string; providerPaymentId?: string | null; amount: string | number; status: string; createdAt: string }>;
+  tracking?: Array<{ id: string; status: string; description: string; timestamp: string }>;
+  returns?: ReturnRequest[];
 }
 
 export interface Product {
@@ -155,8 +167,11 @@ export interface ReturnRequest {
   status: string;
   reason: string;
   refundAmount?: string | number | null;
+  adminNote?: string | null;
+  rejectionReason?: string | null;
+  refundedAt?: string | null;
   createdAt: string;
-  order?: { orderNumber: string; user?: { email: string; name?: string | null } };
+  order?: Order & { orderNumber: string; user?: { email: string; name?: string | null } };
 }
 
 export interface NotificationItem {
@@ -168,6 +183,19 @@ export interface NotificationItem {
   createdAt: string;
 }
 
+export interface AuditLog {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId?: string | null;
+  before?: unknown;
+  after?: unknown;
+  ip?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
+  actor?: { id: string; email: string; name?: string | null } | null;
+}
+
 export interface AnalyticsStats {
   revenue: number;
   orders: number;
@@ -176,4 +204,27 @@ export interface AnalyticsStats {
   conversionRate: number;
   lowStockProducts: number;
   bestSellers?: Array<{ variantId: string | null; _sum: { qty: number | null } }>;
+}
+
+export interface PaymentMaintenanceStatus {
+  configured: boolean;
+  nextRunAt?: string | null;
+  counts?: Record<string, number>;
+  lastRun?: {
+    status: 'success' | 'failed';
+    startedAt: string;
+    finishedAt: string;
+    result?: {
+      expired?: number;
+      reconciled?: number;
+      checkedStripePayments?: number;
+    };
+    error?: string;
+  } | null;
+  failures?: Array<{
+    id?: string | number;
+    failedReason?: string;
+    attemptsMade?: number;
+    timestamp?: string | null;
+  }>;
 }

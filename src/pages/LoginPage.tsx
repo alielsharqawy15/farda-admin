@@ -9,6 +9,7 @@ export default function LoginPage() {
   const location = useLocation();
   const [email, setEmail] = useState('admin@farda.com');
   const [password, setPassword] = useState('Password123!');
+  const [totpCode, setTotpCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -19,7 +20,7 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, totpCode.trim() || undefined);
       navigate(from, { replace: true });
     } catch (err) {
       setError(getErrorMessage(err));
@@ -52,6 +53,16 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded border border-black/10 px-3 py-2 outline-none focus:border-primary"
               required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-tertiary">2FA code</label>
+            <input
+              inputMode="numeric"
+              value={totpCode}
+              onChange={(e) => setTotpCode(e.target.value)}
+              className="w-full rounded border border-black/10 px-3 py-2 outline-none focus:border-primary"
+              placeholder="Required when enabled"
             />
           </div>
           {error && <p className="text-sm text-sale">{error}</p>}
